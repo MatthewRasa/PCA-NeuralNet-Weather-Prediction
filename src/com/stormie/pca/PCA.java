@@ -6,13 +6,12 @@ import java.util.Arrays;
 
 public class PCA {
 
-	public static void runPCA(Matrix x) {
+	public static int[] runPCA(Matrix x) {
 		// Find principal components, sort in descending order
 		double[] prinComps = new double[x.getRows()];
 		for (int r = 0; r < prinComps.length; r++)
 			prinComps[r] = variance(x.getRowAt(r));
 		prinComps = sortDescending(prinComps);
-
 		System.out.println("Principal components: " + Vector.print(prinComps));
 
 		// Compute the covariance matrix
@@ -22,7 +21,6 @@ public class PCA {
 		// Calculate eigenvectors
 		Array2DRowRealMatrix eigMat = new Array2DRowRealMatrix(c.getData());
 		EigenDecomposition eigDec = new EigenDecomposition(eigMat);
-
 		int eigCount = eigDec.getRealEigenvalues().length;
 		double[] eigVals = new double[eigCount];
 		double[][] eigVecs = new double[eigCount][c.getRows()];
@@ -30,12 +28,27 @@ public class PCA {
 			eigVals[i] = eigDec.getRealEigenvalue(i);
 			eigVecs[i] = eigDec.getEigenvector(i).toArray();
 		}
-		
-		Matrix p = new Matrix(eigVecs);
 		System.out.println("Eigenvalues: " + Vector.print(eigVals));
-		System.out.println("Eigenvectors: \n" + p);
+		System.out.println("Eigenvectors: \n" + new Matrix(eigVecs));
 		
-		System.out.println("PoV: " + propOfVar(prinComps));
+		// Dimensionality reduction
+		return rmDims(eigVals, prinComps);
+	}
+
+	private static int[] rmDims(double[] eigVals, double[] prinComps) {
+		int k;
+		double[] sortVals = eigVals.clone();
+		int[] rm = new int[eigVals.length - (k = propOfVar(prinComps))];
+		System.out.println("PoV: " + k);
+
+		Arrays.sort(sortVals);
+		for (int i = 0; i < rm.length; i++) {
+			for (int j = 0; j < eigVals.length; j++) {
+				if (sortVals[i] == eigVals[j])
+					rm[i] = j;
+			}
+		}
+		return rm;
 	}
 
 	private static Matrix covarianceMatrix(Matrix x) {
