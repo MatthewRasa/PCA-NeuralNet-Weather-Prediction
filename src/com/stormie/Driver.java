@@ -20,23 +20,24 @@
 /* Setting Package */
 package com.stormie;
 
-import com.stormie.NeuralNet.NeuralNet;
-import com.stormie.pca.*;
-
 import java.io.BufferedReader;
 import java.io.FileReader;
-/* Setting Imports */
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import com.stormie.NeuralNet.NeuralNet;
+import com.stormie.pca.Matrix;
+import com.stormie.pca.PCA;
 
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
-import org.json.*;
 
 public class Driver {
 
@@ -59,9 +60,9 @@ public class Driver {
 
 		return cal.get(Calendar.DATE);
 	}
-	
+
 	public static void parseJSON(JSONObject json, ArrayList<String> names, ArrayList<Double> data, String label) {
-		for (String key: JSONObject.getNames(json)) {
+		for (String key : JSONObject.getNames(json)) {
 			try {
 				JSONArray children = json.getJSONArray(key);
 				for (int i = 0; i < children.length(); i++)
@@ -75,25 +76,25 @@ public class Driver {
 						data.add(json.getDouble(key));
 						names.add(label + key);
 					} catch (Exception e1) {
-						
+
 					}
 				}
-			} 
+			}
 		}
 	}
 
 	public static double[][] parseWeatherData(ArrayList<String> rLabels) {
 		ArrayList<ArrayList<Double>> totals = new ArrayList<ArrayList<Double>>();
 		double[][] rTotals;
-		
-		for (String entry: pastWeather) {
+
+		for (String entry : pastWeather) {
 			try {
 				ArrayList<String> names = new ArrayList<String>();
 				ArrayList<Double> data = new ArrayList<Double>();
 				parseJSON(new JSONObject(entry), names, data, "");
 				if (names.size() > rLabels.size()) {
 					rLabels.clear();
-					rLabels.addAll(names);	
+					rLabels.addAll(names);
 				}
 				totals.add(data);
 			} catch (Exception e) {
@@ -101,7 +102,7 @@ public class Driver {
 		}
 		rTotals = new double[rLabels.size()][totals.size()];
 		for (int c = 0; c < totals.size(); c++) {
-			for (int r = 0; r < totals.get(c).size(); r++)	
+			for (int r = 0; r < totals.get(c).size(); r++)
 				rTotals[r][c] = totals.get(c).get(r);
 		}
 		return rTotals;
@@ -120,7 +121,7 @@ public class Driver {
 		Response response = client.newCall(request).execute();
 		return response.body().string();
 	}
-	
+
 	public static void readKey() {
 		int lineNum = 0;
 		try {
@@ -148,7 +149,7 @@ public class Driver {
 			System.err.println("Trouble reading file.");
 		}
 	}
-	
+
 	public static void pullWeatherData() {
 		System.out.println("STARTING HTTP REQUESTS");
 		try {
@@ -170,7 +171,6 @@ public class Driver {
 			}
 
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		System.out.println("FINISHED HTTP REQUESTS");
@@ -184,50 +184,82 @@ public class Driver {
 	public static void main(String[] args) {
 		readKey();
 		pullWeatherData();
-		
+
 		// Parse data
-		ArrayList<String> labels = new ArrayList<String>();
+		ArrayList<String> labels = new ArrayList<String>(), reducedLabels = new ArrayList<String>();
 		double[][] totals = parseWeatherData(labels);
-		
+
 		// Perform dimension reduction using PCA
 		Matrix pcaMatrix = new Matrix(totals);
-		int[] removedDims = PCA.runPCA(pcaMatrix);	
+		int[] removedDims = PCA.runPCA(pcaMatrix);
 		ArrayList<ArrayList<Double>> reduced = new ArrayList<ArrayList<Double>>();
 		for (int c = 0; c < pcaMatrix.getCols(); c++) {
 			ArrayList<Double> col = new ArrayList<Double>();
 			for (int r = 0, rmi = 0; r < pcaMatrix.getRows(); r++) {
 				if (r == removedDims[rmi])
 					rmi++;
-				else
+				else {
+					if (c == 0)
+						reducedLabels.add(labels.get(r));
 					col.add(pcaMatrix.getElemAt(r, c));
+				}
 			}
 			reduced.add(col);
 		}
-		System.out.println("\n[PCA] Removed " + removedDims.length + " out of " + pcaMatrix.getRows()
-			+ " dimensions (" + (int)(((double) removedDims.length / pcaMatrix.getRows()) * 100) + "% removed).");
+		System.out.println("\n[PCA] Removed " + removedDims.length + " out of " + pcaMatrix.getRows() + " dimensions ("
+				+ (int) (((double) removedDims.length / pcaMatrix.getRows()) * 100) + "% removed).");
 
 		// Separate training and testing data
 		HashMap<Integer, List<Double>> trainingData = new HashMap<Integer, List<Double>>();
-		int trainSize = 3 * reduced.size() / 4, trainId = 0; // 75% training data
+		int trainSize = 3 * reduced.size() / 4, trainId = 0; // 75% training
+																// data
 		for (int i = 0; i < trainSize; i++)
 			trainingData.put(i, reduced.remove(0));
-		
+
 		// Instantiate neural net
 		NeuralNet nn = new NeuralNet(5, trainingData.get(0).size(), trainingData.get(0), trainingData);
-		
+
 		// Train neural net
 		for (int i = 1; i < trainingData.size(); i++) {
 			nn.feedForward();
 			nn.addData(trainingData.get(i));
 			nn.updateWeights(trainId++);
 		}
-		
+
 		// Test neural net
-		for (ArrayList<Double> sample: reduced) {
-			nn.feedForward();
+		List<Double> out = null;
+		for (ArrayList<Double> sample : reduced) {
+			out = nn.feedForward();
 			nn.addData(sample);
 		}
-		
+
+		System.out.println("Output from final Neural Net iteration:");
+
+		List<List<Object>> print = new ArrayList<List<Object>>();
+		String length = "daily-data-apparentTemperatureMinTime";
+
+		for (int i = 0; i < out.size(); i++) {
+			List<Object> tmp = new ArrayList<Object>();
+
+			String lb = reducedLabels.get(i);
+			while (lb.length() < length.length())
+				lb += " ";
+			tmp.add(lb);
+			// tmp.add("test");
+			tmp.add((Integer) ((int) (out.get(i) * 100.0)) / 100.0);
+
+			print.add(tmp);
+		}
+
+		for (Object ob : print) {
+			System.out.println(ob);
+		}
+
+		double sum = 0;
+		for (int i = 0; i < out.size(); i++)
+			sum += out.get(i);
+		System.out.println("\n" + sum / out.size());
+
 		/*
 		 * List<Double> input = new ArrayList<Double>(); Random r = new
 		 * Random(); for (int i = 0; i < num; i++) { input.add(r.nextDouble());

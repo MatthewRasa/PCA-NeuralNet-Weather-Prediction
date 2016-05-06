@@ -104,9 +104,13 @@ public class NeuralNet {
 		for (int i = (lastLayer - 1); i > 0; i--) {
 			for (int j = 0; j < layers.get(i).getNodes().size(); j++) {
 				Double sum = 0.0;
+				try {
 				for (int k = 0; k < layers.get(i + 1).getNodes().size(); k++) {
 					sum += layers.get(i + 1).getNodes().get(k).getWeights().get(j)
 							* layers.get(i + 1).getNodes().get(k).getSigErr();
+				}
+				} catch(IndexOutOfBoundsException e) {
+
 				}
 				layers.get(i).getNodes().get(j).setSigErr(sum * layers.get(i).getNodes().get(j).getOutput()
 						* (1 - layers.get(i).getNodes().get(j).getOutput()));
@@ -121,14 +125,18 @@ public class NeuralNet {
 				n.setThreshold(n.getThreshold() + n.getThresholdErr());
 
 				/* updates weights */
-				for (int j = 0; j < n.getWeights().size(); j++) {
-					/* Calculate distance between nodes */
-					n.getWeightsErr().set(j,
-							learningRate * n.getSigErr() * layers.get(i - 1).getNodes().get(j).getOutput()
-									+ momentum * n.getWeightsErr().get(j));
-
-					/* Update based on distance */
-					n.getWeights().set(j, n.getWeights().get(j) + n.getWeightsErr().get(j));
+				try {
+					for (int j = 0; j < n.getWeights().size(); j++) {
+						/* Calculate distance between nodes */
+						n.getWeightsErr().set(j,
+								learningRate * n.getSigErr() * layers.get(i - 1).getNodes().get(j).getOutput()
+										+ momentum * n.getWeightsErr().get(j));
+	
+						/* Update based on distance */
+						n.getWeights().set(j, n.getWeights().get(j) + n.getWeightsErr().get(j));
+					}
+				} catch(IndexOutOfBoundsException e) {
+					
 				}
 			}
 		}
