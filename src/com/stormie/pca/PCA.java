@@ -12,11 +12,9 @@ public class PCA {
 		for (int r = 0; r < prinComps.length; r++)
 			prinComps[r] = variance(x.getRowAt(r));
 		prinComps = sortDescending(prinComps);
-		System.out.println("Principal components: " + Vector.print(prinComps));
 
 		// Compute the covariance matrix
 		Matrix c = covarianceMatrix(x);
-		System.out.println("Covariance matrix: \n" + c);
 
 		// Calculate eigenvectors
 		Array2DRowRealMatrix eigMat = new Array2DRowRealMatrix(c.getData());
@@ -28,35 +26,47 @@ public class PCA {
 			eigVals[i] = eigDec.getRealEigenvalue(i);
 			eigVecs[i] = eigDec.getEigenvector(i).toArray();
 		}
-		System.out.println("Eigenvalues: " + Vector.print(eigVals));
-		System.out.println("Eigenvectors: \n" + new Matrix(eigVecs));
 		
 		// Dimensionality reduction
-		return rmDims(eigVals, prinComps);
+		int[] rm = rmDims(eigVals, prinComps);
+		double[][] reducedData = new double[x.getRows() - rm.length][x.getCols()];
+		for (int i = 0, ri = 0, rmi = 0; i < x.getRows(); i++) {
+			if (rmi < rm.length && i == rm[rmi])
+				rmi++;
+			else if (ri < reducedData.length)
+				reducedData[ri++] = x.getRowAt(i);
+		}
+		x = new Matrix(reducedData);
+		return rm;
 	}
 
 	private static int[] rmDims(double[] eigVals, double[] prinComps) {
-		int k;
 		double[] sortVals = eigVals.clone();
-		int[] rm = new int[eigVals.length - (k = propOfVar(prinComps))];
-		System.out.println("PoV: " + k);
+		int[] rm = new int[eigVals.length - propOfVar(prinComps)];
 
 		Arrays.sort(sortVals);
 		for (int i = 0; i < rm.length; i++) {
 			for (int j = 0; j < eigVals.length; j++) {
-				if (sortVals[i] == eigVals[j])
+				if (sortVals[i] == eigVals[j]) {
 					rm[i] = j;
+					eigVals[j] = Integer.MIN_VALUE;
+					break;
+				}
 			}
 		}
 		return rm;
 	}
 
 	private static Matrix covarianceMatrix(Matrix x) {
+//		System.out.println("X: \n" + x);
 		Matrix xClone = x.clone(), 
 			xTrans = x.clone();
 		xTrans.transpose();
+//		System.out.println("Transpose: \n" + xTrans);
 		xClone.multiplyRight(xTrans);
+//		System.out.println("Product: \n" + xClone);
 		xClone.multiplyScalar(1.0 / x.getCols());
+//		System.out.println("Covariance: \n" + xClone);
 		return xClone;
 	}
 
@@ -82,18 +92,6 @@ public class PCA {
 		for (int i = 0; i < rev.length; i++)
 			rev[i] = vector[rev.length - 1 - i];
 		return rev;
-	}
-
-	public class EigenPair {
-
-		private double[] mEigVector;
-		private double mEigValue;
-	
-		public EigenPair(double eigValue, double[] eigVector) {
-			mEigVector = eigVector;
-			mEigValue = eigValue;
-		}
-
-	}
+	}	
 
 }
