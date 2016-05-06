@@ -58,15 +58,12 @@ public class PCA {
 	}
 
 	private static Matrix covarianceMatrix(Matrix x) {
-//		System.out.println("X: \n" + x);
+		System.out.println("X: \n" + x);
 		Matrix xClone = x.clone(), 
 			xTrans = x.clone();
 		xTrans.transpose();
-//		System.out.println("Transpose: \n" + xTrans);
 		xClone.multiplyRight(xTrans);
-//		System.out.println("Product: \n" + xClone);
 		xClone.multiplyScalar(1.0 / x.getCols());
-//		System.out.println("Covariance: \n" + xClone);
 		return xClone;
 	}
 

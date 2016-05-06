@@ -1,4 +1,7 @@
+com/stormie/NeuralNet/NeuralNet.class
 com/stormie/Driver.class
+com/stormie/NeuralNet/Layer.class
 com/stormie/pca/PCA.class
 com/stormie/pca/Matrix.class
 com/stormie/pca/Vector.class
+com/stormie/NeuralNet/Node.class
