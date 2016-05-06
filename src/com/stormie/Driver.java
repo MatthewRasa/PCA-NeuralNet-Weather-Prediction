@@ -20,6 +20,8 @@
 /* Setting Package */
 package com.stormie;
 
+import com.stormie.pca.*;
+
 import java.io.BufferedReader;
 import java.io.FileReader;
 /* Setting Imports */
@@ -54,11 +56,52 @@ public class Driver {
 
 		return cal.get(Calendar.DATE);
 	}
+	
+	public static void parseJSON(JSONObject json, ArrayList<String> names, ArrayList<Double> data, String label) {
+		for (String key: JSONObject.getNames(json)) {
+			try {
+				JSONArray children = json.getJSONArray(key);
+				for (int i = 0; i < children.length(); i++)
+					parseJSON(children.getJSONObject(i), names, data, label + key + "-");
+			} catch (Exception e) {
+				try {
+					JSONObject child = json.getJSONObject(key);
+					parseJSON(child, names, data, label + key + "-");
+				} catch (Exception e0) {
+					try {
+						data.add(json.getDouble(key));
+						names.add(label + key);
+					} catch (Exception e1) {
+						
+					}
+				}
+			} 
+		}
+	}
 
-	public static void parsePastWeather() {
-		for (String str : pastWeather)
-			System.out.println(str);
-		JSONObject obj = new JSONObject(pastWeather);
+	public static double[][] parsePastWeather(ArrayList<String> rLabels) {
+		ArrayList<ArrayList<Double>> totals = new ArrayList<ArrayList<Double>>();
+		double[][] rTotals;
+		
+		for (String entry: pastWeather) {
+			try {
+				ArrayList<String> names = new ArrayList<String>();
+				ArrayList<Double> data = new ArrayList<Double>();
+				parseJSON(new JSONObject(entry), names, data, "");
+				if (names.size() > rLabels.size()) {
+					rLabels.clear();
+					rLabels.addAll(names);	
+				}
+				totals.add(data);
+			} catch (Exception e) {
+			}
+		}
+		rTotals = new double[rLabels.size()][totals.size()];
+		for (int c = 0; c < totals.size(); c++) {
+			for (int r = 0; r < totals.get(c).size(); r++)	
+				rTotals[r][c] = totals.get(c).get(r);
+		}
+		return rTotals;
 	}
 
 	/**
@@ -128,14 +171,33 @@ public class Driver {
 						+ "T12:00:00-0400"));
 			}
 
-			parsePastWeather();
-
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-
+		
 		System.out.println("FINISHED HTTP REQUESTS");
+		
+		// Parse data
+		ArrayList<String> labels = new ArrayList<String>();
+		double[][] totals = parsePastWeather(labels);
+		
+		// Perform dimension reduction using PCA
+		Matrix pcaMatrix = new Matrix(totals);
+		int[] removedDims = PCA.runPCA(pcaMatrix);	
+		ArrayList<ArrayList<Double>> reduced = new ArrayList<ArrayList<Double>>();
+		for (int c = 0; c < pcaMatrix.getCols(); c++) {
+			ArrayList<Double> col = new ArrayList<Double>();
+			for (int r = 0, rmi = 0; r < pcaMatrix.getRows(); r++) {
+				if (r == removedDims[rmi])
+					rmi++;
+				else
+					col.add(pcaMatrix.getElemAt(r, c));
+			}
+			reduced.add(col);
+		}
+		System.out.println("\n[PCA] Removed " + removedDims.length + " out of " + pcaMatrix.getRows()
+			+ " dimensions (" + (int)(((double) removedDims.length / pcaMatrix.getRows()) * 100) + "% removed).");
 
 		/*
 		 * List<Double> input = new ArrayList<Double>(); Random r = new

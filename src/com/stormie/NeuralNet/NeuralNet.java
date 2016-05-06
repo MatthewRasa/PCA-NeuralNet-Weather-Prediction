@@ -54,6 +54,10 @@ public class NeuralNet {
 			layers.add(new Layer(numNodesPerLayer));
 			numLayers--;
 		}
+		addData(input);
+	}
+	
+	public void addData(List<Double> input) {
 		layers.get(0).setInputFromLastLayer(input);
 	}
 
