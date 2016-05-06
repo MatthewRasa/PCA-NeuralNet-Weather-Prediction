@@ -20,6 +20,7 @@
 /* Setting Package */
 package com.stormie;
 
+import com.stormie.NeuralNet.NeuralNet;
 import com.stormie.pca.*;
 
 import java.io.BufferedReader;
@@ -28,7 +29,9 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -79,7 +82,7 @@ public class Driver {
 		}
 	}
 
-	public static double[][] parsePastWeather(ArrayList<String> rLabels) {
+	public static double[][] parseWeatherData(ArrayList<String> rLabels) {
 		ArrayList<ArrayList<Double>> totals = new ArrayList<ArrayList<Double>>();
 		double[][] rTotals;
 		
@@ -117,16 +120,9 @@ public class Driver {
 		Response response = client.newCall(request).execute();
 		return response.body().string();
 	}
-
-	/**
-	 * Main method.
-	 * 
-	 * @param args
-	 */
-	public static void main(String[] args) {
-
+	
+	public static void readKey() {
 		int lineNum = 0;
-
 		try {
 			FileReader inF = new FileReader("API_KEY.txt");
 			BufferedReader in = new BufferedReader(inF);
@@ -151,7 +147,9 @@ public class Driver {
 		} catch (IOException e) {
 			System.err.println("Trouble reading file.");
 		}
-
+	}
+	
+	public static void pullWeatherData() {
 		System.out.println("STARTING HTTP REQUESTS");
 		try {
 			for (int i = 6; i > 0; i--) {
@@ -175,12 +173,21 @@ public class Driver {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		
 		System.out.println("FINISHED HTTP REQUESTS");
+	}
+
+	/**
+	 * Main method.
+	 * 
+	 * @param args
+	 */
+	public static void main(String[] args) {
+		readKey();
+		pullWeatherData();
 		
 		// Parse data
 		ArrayList<String> labels = new ArrayList<String>();
-		double[][] totals = parsePastWeather(labels);
+		double[][] totals = parseWeatherData(labels);
 		
 		// Perform dimension reduction using PCA
 		Matrix pcaMatrix = new Matrix(totals);
@@ -199,6 +206,28 @@ public class Driver {
 		System.out.println("\n[PCA] Removed " + removedDims.length + " out of " + pcaMatrix.getRows()
 			+ " dimensions (" + (int)(((double) removedDims.length / pcaMatrix.getRows()) * 100) + "% removed).");
 
+		// Separate training and testing data
+		HashMap<Integer, List<Double>> trainingData = new HashMap<Integer, List<Double>>();
+		int trainSize = 3 * reduced.size() / 4, trainId = 0; // 75% training data
+		for (int i = 0; i < trainSize; i++)
+			trainingData.put(i, reduced.remove(0));
+		
+		// Instantiate neural net
+		NeuralNet nn = new NeuralNet(5, trainingData.get(0).size(), trainingData.get(0), trainingData);
+		
+		// Train neural net
+		for (int i = 1; i < trainingData.size(); i++) {
+			nn.feedForward();
+			nn.addData(trainingData.get(i));
+			nn.updateWeights(trainId++);
+		}
+		
+		// Test neural net
+		for (ArrayList<Double> sample: reduced) {
+			nn.feedForward();
+			nn.addData(sample);
+		}
+		
 		/*
 		 * List<Double> input = new ArrayList<Double>(); Random r = new
 		 * Random(); for (int i = 0; i < num; i++) { input.add(r.nextDouble());

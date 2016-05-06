@@ -48,7 +48,6 @@ public class NeuralNet {
 		learningRate = 0.2;
 		epoch = 0;
 		layers = new ArrayList<Layer>();
-		expectedOutput = new HashMap<Integer, List<Double>>();
 		this.expectedOutput = expectedOutput;
 		while (numLayers > 0) {
 			layers.add(new Layer(numNodesPerLayer));
@@ -91,7 +90,7 @@ public class NeuralNet {
 		/* Calculate signal error in output layer */
 		for (Node n : layers.get(lastLayer).getNodes()) {
 			int i = layers.get(lastLayer).getNodes().indexOf(n);
-			Double sigErr = ((expectedOutput.get(sampleNum).get(i)
+			Double sigErr = ((expectedOutput.get(sampleNum % expectedOutput.size()).get(i)
 					- layers.get(lastLayer).getNodes().get(i).getOutput())
 					* layers.get(lastLayer).getNodes().get(i).getOutput()
 					* (1 - layers.get(lastLayer).getNodes().get(i).getOutput()));
